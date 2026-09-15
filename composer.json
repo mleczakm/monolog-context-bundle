@@ -1,0 +1,62 @@
+{
+    "name": "mleczakm/monolog-context-bundle",
+    "type": "symfony-bundle",
+    "description": "Adds user, request, browser and geo-location context to Monolog log records.",
+    "keywords": [
+        "monolog",
+        "logging",
+        "logger",
+        "symfony",
+        "bundle",
+        "context",
+        "user-context"
+    ],
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Michał Mleczko",
+            "email": "do@mleczki.pl"
+        }
+    ],
+    "require": {
+        "php": "^8.2",
+        "monolog/monolog": "^3.0",
+        "symfony/config": "^6.4 || ^7.0 || ^8.0",
+        "symfony/dependency-injection": "^6.4 || ^7.0 || ^8.0",
+        "symfony/http-foundation": "^6.4 || ^7.0 || ^8.0",
+        "symfony/http-kernel": "^6.4 || ^7.0 || ^8.0",
+        "symfony/security-core": "^6.4 || ^7.0 || ^8.0",
+        "symfony/uid": "^6.4 || ^7.0 || ^8.0"
+    },
+    "require-dev": {
+        "donatj/phpuseragentparser": "^1.7",
+        "friendsofphp/php-cs-fixer": "^3.59",
+        "geoip2/geoip2": "^3.0",
+        "phpstan/phpstan": "^2.1",
+        "phpunit/phpunit": "^11.0",
+        "psr/simple-cache": "^3.0",
+        "symfony/framework-bundle": "^6.4 || ^7.0 || ^8.0"
+    },
+    "suggest": {
+        "donatj/phpuseragentparser": "To parse the User-Agent header with the \"phpuseragent\" browser parser",
+        "geoip2/geoip2": "To resolve request IPs to a country/city with the built-in MaxMind geo-location resolver",
+        "psr/simple-cache": "To cache parsed User-Agent headers",
+        "symfony/security-bundle": "To append the authenticated user's identifier, email and roles to logs"
+    },
+    "autoload": {
+        "psr-4": {
+            "Mleczakm\\MonologContextBundle\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Mleczakm\\MonologContextBundle\\Tests\\": "tests/"
+        }
+    },
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": false
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}
