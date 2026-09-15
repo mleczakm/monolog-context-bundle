@@ -16,7 +16,13 @@ use MaxMind\Db\Reader\InvalidDatabaseException;
  */
 final class MaxMindGeoLocationResolver implements GeoLocationResolverInterface
 {
-    private Reader|false|null $reader = null;
+    /**
+     * Not the database open state itself - just remembers that opening it
+     * has failed before, to avoid retrying a known-missing/invalid file on
+     * every call. A plain bool is safe to share across concurrent callers;
+     * a cached Reader is not - see the note on openReader() below.
+     */
+    private bool $unavailable = false;
 
     public function __construct(
         private readonly string $databasePath,
@@ -31,9 +37,9 @@ final class MaxMindGeoLocationResolver implements GeoLocationResolverInterface
 
     public function resolve(string $ip): ?GeoLocation
     {
-        $reader = $this->getReader();
+        $reader = $this->openReader();
 
-        if ($reader === false) {
+        if ($reader === null) {
             return null;
         }
 
@@ -53,21 +59,24 @@ final class MaxMindGeoLocationResolver implements GeoLocationResolverInterface
     }
 
     /**
-     * Opens the database lazily rather than in the constructor, and on the
-     * first request only: this resolver is invoked from a Monolog processor,
-     * which can run as a side effect of unrelated logging (e.g. during a
-     * build-time cache:warmup, before a database mounted at deploy time
-     * exists). A missing or invalid database must degrade to "no geo data"
-     * rather than take down every code path that logs anything.
+     * Opens a fresh Reader on every call rather than reusing one: this
+     * resolver is a long-lived service under runtimes like Swoole, where one
+     * instance serves many concurrent coroutines. GeoIp2/MaxMind's Reader is
+     * not reentrant - it throws BadMethodCallException ("A lookup is already
+     * in progress on this reader") if a second lookup starts on the same
+     * instance before the first finishes, which a shared cached Reader hits
+     * in production as soon as two coroutines' lookups interleave. Opening
+     * the database only reads its (small) metadata section, not the whole
+     * file, so doing this per call is cheap enough to trade for correctness.
      */
-    private function getReader(): Reader|false
+    private function openReader(): ?Reader
     {
-        if ($this->reader !== null) {
-            return $this->reader;
+        if ($this->unavailable) {
+            return null;
         }
 
         try {
-            return $this->reader = new Reader($this->databasePath);
+            return new Reader($this->databasePath);
         } catch (\Exception) {
             // Deliberately broad: GeoIp2\Database\Reader's own @throws only
             // documents InvalidDatabaseException, but its underlying
@@ -75,7 +84,9 @@ final class MaxMindGeoLocationResolver implements GeoLocationResolverInterface
             // \InvalidArgumentException for a missing/unreadable file - this
             // boundary must swallow any failure to open the database, not an
             // enumerated subset of them.
-            return $this->reader = false;
+            $this->unavailable = true;
+
+            return null;
         }
     }
 }
