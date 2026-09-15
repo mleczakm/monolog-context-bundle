@@ -10,6 +10,7 @@ use Mleczakm\MonologContextBundle\Processor\GeoLocationProcessor;
 use Mleczakm\MonologContextBundle\Processor\RequestProcessor;
 use Mleczakm\MonologContextBundle\Processor\TagProcessor;
 use Mleczakm\MonologContextBundle\Processor\UserProcessor;
+use Mleczakm\MonologContextBundle\RequestId\RequestIdGeneratorInterface;
 use Mleczakm\MonologContextBundle\RequestId\RequestIdListener;
 use Mleczakm\MonologContextBundle\RequestId\RequestIdStorage;
 use Mleczakm\MonologContextBundle\RequestId\UuidRequestIdGenerator;
@@ -89,6 +90,7 @@ final class MonologContextBundle extends AbstractBundle
 
         if ($config['request']['enabled']) {
             $builder->register(UuidRequestIdGenerator::class, UuidRequestIdGenerator::class);
+            $builder->setAlias(RequestIdGeneratorInterface::class, UuidRequestIdGenerator::class);
 
             $builder->register(RequestIdStorage::class, RequestIdStorage::class)
                 ->setAutowired(true)

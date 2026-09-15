@@ -12,6 +12,9 @@ use Mleczakm\MonologContextBundle\Processor\TagProcessor;
 use Mleczakm\MonologContextBundle\Processor\UserProcessor;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
+use Symfony\Component\HttpFoundation\RequestStack;
+use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorage;
+use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorageInterface;
 
 final class BundleWiringTest extends TestCase
 {
@@ -53,6 +56,24 @@ final class BundleWiringTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
 
         $this->loadContainer(['geo_location' => ['enabled' => true]]);
+    }
+
+    /**
+     * Registering definitions with hasDefinition() alone doesn't catch autowiring
+     * mistakes (e.g. a missing interface alias) - only a full compile does.
+     */
+    public function testDefaultConfigurationCompilesWithoutErrors(): void
+    {
+        $builder = $this->loadContainer([]);
+        $builder->register('request_stack', RequestStack::class)->setPublic(true);
+        $builder->register(TokenStorageInterface::class, TokenStorage::class)->setPublic(true);
+
+        $builder->compile();
+
+        // The service isn't public and nothing here consumes the "monolog.processor"
+        // tag, so it's compiled away - proof the container reached that point without
+        // an autowiring exception is that it's listed as a removed, not missing, id.
+        self::assertArrayHasKey(RequestProcessor::class, $builder->getRemovedIds());
     }
 
     /**
