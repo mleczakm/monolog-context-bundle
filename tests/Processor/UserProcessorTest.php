@@ -8,7 +8,10 @@ use Mleczakm\MonologContextBundle\Processor\UserProcessor;
 use Monolog\Level;
 use Monolog\LogRecord;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\HttpFoundation\Exception\SessionNotFoundException;
 use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorage;
+use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorageInterface;
+use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
 use Symfony\Component\Security\Core\Authentication\Token\UsernamePasswordToken;
 use Symfony\Component\Security\Core\User\InMemoryUser;
 
@@ -73,6 +76,30 @@ final class UserProcessorTest extends TestCase
         $record = $processor($this->createRecord());
 
         self::assertSame('jdoe@example.com', $record->context['user']['email']);
+    }
+
+    public function testItLeavesRecordUntouchedWhenTokenStorageHasNoSession(): void
+    {
+        // A session-usage-tracking TokenStorageInterface decorator throws this
+        // whenever getToken() is called outside a session-capable request
+        // (stateless contexts, component rendering in tests, etc.). Logging
+        // must never fail just because no session exists yet.
+        $tokenStorage = new class () implements TokenStorageInterface {
+            public function getToken(): ?TokenInterface
+            {
+                throw new SessionNotFoundException('There is currently no session available.');
+            }
+
+            public function setToken(?TokenInterface $token): void
+            {
+            }
+        };
+
+        $processor = new UserProcessor($tokenStorage);
+
+        $record = $this->createRecord();
+
+        self::assertSame($record, $processor($record));
     }
 
     private function createRecord(): LogRecord

@@ -6,6 +6,7 @@ namespace Mleczakm\MonologContextBundle\Processor;
 
 use Monolog\LogRecord;
 use Monolog\Processor\ProcessorInterface;
+use Symfony\Component\HttpFoundation\Exception\SessionNotFoundException;
 use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorageInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
 
@@ -22,7 +23,16 @@ final class UserProcessor implements ProcessorInterface
 
     public function __invoke(LogRecord $record): LogRecord
     {
-        $user = $this->tokenStorage->getToken()?->getUser();
+        try {
+            $user = $this->tokenStorage->getToken()?->getUser();
+        } catch (SessionNotFoundException) {
+            // TokenStorageInterface is commonly decorated with a session-usage-tracking
+            // storage that touches the session on every getToken() call. That throws
+            // here whenever a log call happens outside of a session-capable request
+            // (stateless contexts, component rendering in tests, etc.) - logging must
+            // never fail just because no session exists yet.
+            return $record;
+        }
 
         if (!$user instanceof UserInterface) {
             return $record;
