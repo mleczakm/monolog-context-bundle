@@ -16,24 +16,29 @@ use MaxMind\Db\Reader\InvalidDatabaseException;
  */
 final class MaxMindGeoLocationResolver implements GeoLocationResolverInterface
 {
-    private readonly Reader $reader;
+    private Reader|false|null $reader = null;
 
-    public function __construct(string $databasePath)
-    {
+    public function __construct(
+        private readonly string $databasePath,
+    ) {
         if (!class_exists(Reader::class)) {
             throw new \LogicException(sprintf(
                 '"%s" requires the "geoip2/geoip2" package. Run "composer require geoip2/geoip2".',
                 self::class,
             ));
         }
-
-        $this->reader = new Reader($databasePath);
     }
 
     public function resolve(string $ip): ?GeoLocation
     {
+        $reader = $this->getReader();
+
+        if ($reader === false) {
+            return null;
+        }
+
         try {
-            $record = $this->reader->city($ip);
+            $record = $reader->city($ip);
         } catch (AddressNotFoundException|InvalidDatabaseException) {
             return null;
         }
@@ -45,5 +50,32 @@ final class MaxMindGeoLocationResolver implements GeoLocationResolverInterface
             latitude: $record->location->latitude,
             longitude: $record->location->longitude,
         );
+    }
+
+    /**
+     * Opens the database lazily rather than in the constructor, and on the
+     * first request only: this resolver is invoked from a Monolog processor,
+     * which can run as a side effect of unrelated logging (e.g. during a
+     * build-time cache:warmup, before a database mounted at deploy time
+     * exists). A missing or invalid database must degrade to "no geo data"
+     * rather than take down every code path that logs anything.
+     */
+    private function getReader(): Reader|false
+    {
+        if ($this->reader !== null) {
+            return $this->reader;
+        }
+
+        try {
+            return $this->reader = new Reader($this->databasePath);
+        } catch (\Exception) {
+            // Deliberately broad: GeoIp2\Database\Reader's own @throws only
+            // documents InvalidDatabaseException, but its underlying
+            // MaxMind\Db\Reader constructor also throws a plain
+            // \InvalidArgumentException for a missing/unreadable file - this
+            // boundary must swallow any failure to open the database, not an
+            // enumerated subset of them.
+            return $this->reader = false;
+        }
     }
 }
